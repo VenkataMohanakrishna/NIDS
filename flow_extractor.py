@@ -3,31 +3,53 @@ import pandas as pd
 import numpy as np
 import os
 from collections import defaultdict
+from typing import DefaultDict, List, TypedDict, Any, Tuple
 
-pcap_file = "test_live.pcap"
+class FlowFeatures(TypedDict):
+    times: List[float]
+    lengths: List[int]
+    fwd_lengths: List[int]
+    bwd_lengths: List[int]
+    fwd_packets: int
+    bwd_packets: int
+    fin_count: int
+    psh_count: int
+    ack_count: int
+
 output_file = "live_flows_basic.csv"
+capture_duration = 5
+print(f"Starting LIVE network capture for {capture_duration} seconds...")
 
-print("Loading packets from:", pcap_file)
+try:
+    capture = pyshark.LiveCapture(interface='Wi-Fi')
+    capture.sniff(timeout=capture_duration)
+except Exception:
+    capture = pyshark.LiveCapture()
+    capture.sniff(timeout=capture_duration)
 
-capture = pyshark.FileCapture(pcap_file, keep_packets=False)
+packet_list = getattr(capture, '_packets', [])
+print(f"Captured {len(packet_list)} packets in {capture_duration} seconds.")
 
-flows = defaultdict(lambda: {
-    "times": [],
-    "lengths": [],
-    "fwd_lengths": [],
-    "bwd_lengths": [],
-    "fwd_packets": 0,
-    "bwd_packets": 0,
-    "fin_count": 0,
-    "psh_count": 0,
-    "ack_count": 0
-})
+def new_flow() -> FlowFeatures:
+    return {
+        "times": [],
+        "lengths": [],
+        "fwd_lengths": [],
+        "bwd_lengths": [],
+        "fwd_packets": 0,
+        "bwd_packets": 0,
+        "fin_count": 0,
+        "psh_count": 0,
+        "ack_count": 0
+    }
+
+flows: dict[Tuple[Any, ...], FlowFeatures] = {}
 
 # ---------------------------------------------------
 # Packet collection
 # ---------------------------------------------------
 
-for pkt in capture:
+for pkt in packet_list:
 
     try:
         if 'IP' in pkt and pkt.transport_layer:
@@ -42,11 +64,15 @@ for pkt in capture:
             pkt_len = int(pkt.length)
             timestamp = float(pkt.sniff_timestamp)
 
-            endpoint1 = (src_ip, src_port)
-            endpoint2 = (dst_ip, dst_port)
+            endpoint1 = (str(src_ip), int(src_port))
+            endpoint2 = (str(dst_ip), int(dst_port))
 
-            flow_id = tuple(sorted([endpoint1, endpoint2])) + (proto,)
+            endpoints = [endpoint1, endpoint2]
+            endpoints.sort()
+            flow_id = tuple(endpoints) + (str(proto),)
 
+            if flow_id not in flows:
+                flows[flow_id] = new_flow()
             flow = flows[flow_id]
 
             flow["times"].append(timestamp)
@@ -119,18 +145,19 @@ for flow_id, flow in flows.items():
     last_time = times[0]
     active_start = last_time
 
-    for t in times[1:]:
+    for i in range(1, len(times)):
+        t = times[i]
 
         gap = t - last_time
 
         if gap > threshold:
-            active_times.append(last_time - active_start)
-            idle_times.append(gap)
+            active_times.append(float(last_time) - float(active_start))
+            idle_times.append(float(gap))
             active_start = t
 
         last_time = t
 
-    active_times.append(last_time - active_start)
+    active_times.append(float(last_time) - float(active_start))
 
     if active_times:
         active_mean = np.mean(active_times)
@@ -147,8 +174,8 @@ for flow_id, flow in flows.items():
         idle_mean = idle_max = idle_min = 0
 
     if duration > 0:
-        bytes_per_sec = total_bytes / duration
-        packets_per_sec = total_packets / duration
+        bytes_per_sec = float(total_bytes) / float(duration)
+        packets_per_sec = float(total_packets) / float(duration)
     else:
         bytes_per_sec = packets_per_sec = 0
 
