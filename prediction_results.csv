@@ -1,6 +1,4 @@
 Flow,Prediction,Confidence,Severity,Reason,Key_Features
-1,BENIGN,0.95,LOW,Traffic behavior is consistent with normal network activity and does not exhibit malicious characteristics.,N/A
-2,BENIGN,1.0,LOW,Traffic behavior is consistent with normal network activity and does not exhibit malicious characteristics.,N/A
-3,BENIGN,0.998,LOW,Traffic behavior is consistent with normal network activity and does not exhibit malicious characteristics.,N/A
-4,BENIGN,1.0,LOW,Traffic behavior is consistent with normal network activity and does not exhibit malicious characteristics.,N/A
-5,BENIGN,0.999,LOW,Traffic behavior is consistent with normal network activity and does not exhibit malicious characteristics.,N/A
+1,BENIGN,0.912,LOW,Traffic behavior is consistent with normal network activity and does not exhibit malicious characteristics.,N/A
+2,BENIGN,0.634,LOW,Traffic behavior is consistent with normal network activity and does not exhibit malicious characteristics.,N/A
+3,BENIGN,0.858,LOW,Traffic behavior is consistent with normal network activity and does not exhibit malicious characteristics.,N/A
