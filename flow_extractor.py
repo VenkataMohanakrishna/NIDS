@@ -16,19 +16,29 @@ class FlowFeatures(TypedDict):
     psh_count: int
     ack_count: int
 
+import sys
+
 output_file = "live_flows_basic.csv"
 capture_duration = 5
-print(f"Starting LIVE network capture for {capture_duration} seconds...")
 
-try:
-    capture = pyshark.LiveCapture(interface='Wi-Fi')
-    capture.sniff(timeout=capture_duration)
-except Exception:
-    capture = pyshark.LiveCapture()
-    capture.sniff(timeout=capture_duration)
+if len(sys.argv) > 1:
+    pcap_file = sys.argv[1]
+    print(f"Starting PCAP network capture from {pcap_file}...")
+    capture = pyshark.FileCapture(pcap_file)
+    capture.load_packets()
+    packet_list = [pkt for pkt in capture]
+    print(f"Captured {len(packet_list)} packets from PCAP.")
+else:
+    print(f"Starting LIVE network capture for {capture_duration} seconds...")
+    try:
+        capture = pyshark.LiveCapture(interface='Wi-Fi')
+        capture.sniff(timeout=capture_duration)
+    except Exception:
+        capture = pyshark.LiveCapture()
+        capture.sniff(timeout=capture_duration)
 
-packet_list = getattr(capture, '_packets', [])
-print(f"Captured {len(packet_list)} packets in {capture_duration} seconds.")
+    packet_list = getattr(capture, '_packets', [])
+    print(f"Captured {len(packet_list)} packets in {capture_duration} seconds.")
 
 def new_flow() -> FlowFeatures:
     return {

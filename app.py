@@ -236,9 +236,14 @@ st.markdown("""
 # ----------------------------------------------------
 # Header Section
 # ----------------------------------------------------
-st.markdown("""
+if "pcap_mode" not in st.session_state:
+    st.session_state.pcap_mode = False
+
+heading_title = "Offline PCAP Analysis: Network Intrusion Detection System" if st.session_state.pcap_mode else "Real Time Automatic Network Intrusion Detection System"
+
+st.markdown(f"""
 <div class="main-header">
-    <h1>Real time automatic network intrusion detection system</h1>
+    <h1>{heading_title}</h1>
 </div>
 """, unsafe_allow_html=True)
 
@@ -252,22 +257,38 @@ with st.sidebar:
     st.markdown("## ⚙️ Control Panel")
     st.markdown("---")
     
-    button_label = "🔴 Stop Monitoring" if st.session_state.is_monitoring else "🟢 Start Monitoring"
+    button_label = "🔴 Stop Monitoring" if st.session_state.is_monitoring else "🟢 Start Monitoring Live Traffic"
     if st.button(button_label, use_container_width=True):
         st.session_state.is_monitoring = not st.session_state.is_monitoring
+        st.session_state.pcap_mode = False
         st.rerun()
     
+    st.markdown("---")
+    st.markdown("### 📁 PCAP Analysis")
+    uploaded_file = st.file_uploader("Upload .pcap file", type=["pcap", "pcapng"])
+    if uploaded_file is not None:
+        if st.button("🔍 Analyze PCAP", use_container_width=True):
+            st.session_state.is_monitoring = False
+            st.session_state.pcap_mode = True
+            with open("temp_upload.pcap", "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            with st.spinner("Analyzing PCAP file..."):
+                subprocess.run([sys.executable, "flow_extractor.py", "temp_upload.pcap"], check=True)
+                subprocess.run([sys.executable, "predict_live.py"], check=True)
+            st.rerun()
+
     st.markdown("---")
     refresh_rate = st.slider("🔄 Refresh Interval (sec)", min_value=1, max_value=30, value=5, step=1)
     
     st.markdown("---")
     
-    st.markdown("""
+    mode_text = "Offline PCAP Analysis" if st.session_state.pcap_mode else "Live Packet Capture"
+    st.markdown(f"""
     <div style='background:#1e293b; padding:1rem; border-radius:8px; border:1px solid #334155;'>
         <h4 style='color:#cbd5e1; margin-top:0;'>Status</h4>
         <p style='color:#94a3b8; font-size:0.9rem; margin-bottom:0;'>
             Engine: <strong>LSTM Multi-class</strong><br>
-            Mode: <strong>Live Packet Capture</strong>
+            Mode: <strong>{mode_text}</strong>
         </p>
     </div>
     """, unsafe_allow_html=True)
