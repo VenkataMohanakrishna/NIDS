@@ -126,7 +126,8 @@ for flow_id, flow in flows.items():
     start_time = min(times)
     end_time = max(times)
 
-    duration = end_time - start_time
+    duration_sec = end_time - start_time
+    duration_micro = duration_sec * 1000000.0
 
     total_packets = len(lengths)
     total_bytes = sum(lengths)
@@ -138,7 +139,7 @@ for flow_id, flow in flows.items():
 
     # Inter-arrival times
     if len(times) > 1:
-        iat = np.diff(times)
+        iat = np.diff(times) * 1000000.0
         iat_mean = np.mean(iat)
         iat_std = np.std(iat)
         iat_max = np.max(iat)
@@ -161,13 +162,13 @@ for flow_id, flow in flows.items():
         gap = t - last_time
 
         if gap > threshold:
-            active_times.append(float(last_time) - float(active_start))
-            idle_times.append(float(gap))
+            active_times.append((float(last_time) - float(active_start)) * 1000000.0)
+            idle_times.append(float(gap) * 1000000.0)
             active_start = t
 
         last_time = t
 
-    active_times.append(float(last_time) - float(active_start))
+    active_times.append((float(last_time) - float(active_start)) * 1000000.0)
 
     if active_times:
         active_mean = np.mean(active_times)
@@ -183,15 +184,15 @@ for flow_id, flow in flows.items():
     else:
         idle_mean = idle_max = idle_min = 0
 
-    if duration > 0:
-        bytes_per_sec = float(total_bytes) / float(duration)
-        packets_per_sec = float(total_packets) / float(duration)
+    if duration_sec > 0:
+        bytes_per_sec = float(total_bytes) / float(duration_sec)
+        packets_per_sec = float(total_packets) / float(duration_sec)
     else:
         bytes_per_sec = packets_per_sec = 0
 
     row = {
 
-        "Flow Duration": duration,
+        "Flow Duration": duration_micro,
 
         "Total Fwd Packets": flow["fwd_packets"],
         "Total Length of Fwd Packets": sum(fwd_lengths),

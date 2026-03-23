@@ -119,8 +119,20 @@ def generate_attack_explanation(predicted_label, confidence, original_features_r
             feature_values[feat] = float(round(float(original_features_row[feat]), 3))
     
     feat_str = ", ".join([f"{k}: {v}" for k, v in feature_values.items()]) if feature_values else "N/A"
+    
+    dynamic_reason = rule["reason"]
+    if predicted_label == "FLOODING":
+        dynamic_reason = f"Extremely high packet rate ({feature_values.get('Flow Packets/s', 0)} pkts/s) and byte rate ({feature_values.get('Flow Bytes/s', 0)} bytes/s) with short inter-arrival times ({feature_values.get('Flow IAT Mean', 0)} µs) spanning a duration of {feature_values.get('Flow Duration', 0)} µs, indicating flooding behavior."
+    elif predicted_label == "SCANNING":
+        dynamic_reason = f"Multiple short-lived connections (avg duration {feature_values.get('Flow Duration', 0)} µs) with {feature_values.get('Total Fwd Packets', 0)} forward packets, targeting port {feature_values.get('Destination Port', 'Unknown')}, consistent with port scanning."
+    elif predicted_label == "BOTNET":
+        dynamic_reason = f"Automated communication patterns with periodic idle ({feature_values.get('Idle Mean', 0)} µs) and active ({feature_values.get('Active Mean', 0)} µs) cycles, and IAT mean of {feature_values.get('Flow IAT Mean', 0)} µs, suggesting C&C behavior."
+    elif predicted_label == "BRUTE_FORCE":
+        dynamic_reason = f"Repeated connection attempts ({feature_values.get('Total Fwd Packets', 0)} packets) within a short duration ({feature_values.get('Flow Duration', 0)} µs) at {feature_values.get('Flow Packets/s', 0)} pkts/s, indicating brute-force authentication attacks."
+    elif predicted_label == "WEB_ATTACK":
+        dynamic_reason = f"Abnormal packet size patterns (Mean= {feature_values.get('Packet Length Mean', 0)}, Variance= {feature_values.get('Packet Length Variance', 0)}) over duration {feature_values.get('Flow Duration', 0)} µs, consistent with application-layer web attacks."
             
-    return {"severity": rule["severity"], "reason": rule["reason"], "key_features": feat_str}
+    return {"severity": rule["severity"], "reason": dynamic_reason, "key_features": feat_str}
 
 attack_flows = []
 results = []
