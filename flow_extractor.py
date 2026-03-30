@@ -34,9 +34,17 @@ class Flow:
         self.last_time = self.start_time
         
         # 5-tuple
-        self.src_ip = first_pkt.ip.src
+        if 'IP' in first_pkt:
+            self.src_ip = first_pkt.ip.src
+            self.dst_ip = first_pkt.ip.dst
+        elif 'IPv6' in first_pkt:
+            self.src_ip = first_pkt.ipv6.src
+            self.dst_ip = first_pkt.ipv6.dst
+        else:
+            self.src_ip = "0.0.0.0"
+            self.dst_ip = "0.0.0.0"
+            
         self.src_port = int(first_pkt[first_pkt.transport_layer].srcport)
-        self.dst_ip = first_pkt.ip.dst
         self.dst_port = int(first_pkt[first_pkt.transport_layer].dstport)
         self.protocol = first_pkt.transport_layer
         
@@ -64,7 +72,14 @@ class Flow:
         pkt_len = int(pkt.length)
         
         # Direction handling
-        is_fwd = (pkt.ip.src == self.src_ip and 
+        if 'IP' in pkt:
+            pkt_src_ip = pkt.ip.src
+        elif 'IPv6' in pkt:
+            pkt_src_ip = pkt.ipv6.src
+        else:
+            pkt_src_ip = "0.0.0.0"
+            
+        is_fwd = (pkt_src_ip == self.src_ip and 
                   int(pkt[pkt.transport_layer].srcport) == self.src_port)
         
         # Flow IAT
@@ -140,13 +155,19 @@ class Flow:
         # Header Lengths
         fwd_header_len = 0
         for p in self.fwd_packets:
-            fwd_header_len += int(p.ip.hdr_len)
+            if 'IP' in p:
+                fwd_header_len += int(p.ip.hdr_len)
+            elif 'IPv6' in p:
+                fwd_header_len += 40
             if self.protocol == 'TCP': fwd_header_len += int(p.tcp.hdr_len)
             elif self.protocol == 'UDP': fwd_header_len += 8
         
         bwd_header_len = 0
         for p in self.bwd_packets:
-            bwd_header_len += int(p.ip.hdr_len)
+            if 'IP' in p:
+                bwd_header_len += int(p.ip.hdr_len)
+            elif 'IPv6' in p:
+                bwd_header_len += 40
             if self.protocol == 'TCP': bwd_header_len += int(p.tcp.hdr_len)
             elif self.protocol == 'UDP': bwd_header_len += 8
             
@@ -251,11 +272,16 @@ def process_pcaps():
             break
             
         try:
-            if 'IP' not in pkt or not pkt.transport_layer:
+            if ('IP' not in pkt and 'IPv6' not in pkt) or not pkt.transport_layer:
                 continue
             
-            src_ip = pkt.ip.src
-            dst_ip = pkt.ip.dst
+            if 'IP' in pkt:
+                src_ip = pkt.ip.src
+                dst_ip = pkt.ip.dst
+            else:
+                src_ip = pkt.ipv6.src
+                dst_ip = pkt.ipv6.dst
+                
             src_port = int(pkt[pkt.transport_layer].srcport)
             dst_port = int(pkt[pkt.transport_layer].dstport)
             proto = pkt.transport_layer
@@ -276,6 +302,7 @@ def process_pcaps():
                 print(f"Processed {count} packets...")
                 
         except Exception as e:
+            print(f"Packet parsing error: {e}")
             continue
             
     print(f"Total packets processed: {count}")

@@ -1,6 +1,13 @@
 import pandas as pd
 import numpy as np
 import joblib
+import warnings
+from sklearn.exceptions import InconsistentVersionWarning
+warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 from tensorflow.keras.models import load_model
 
 print("====================================")
