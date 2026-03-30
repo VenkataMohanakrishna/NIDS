@@ -29,6 +29,14 @@ df = pd.read_csv("live_flows_basic.csv")
 
 print("Flows loaded:", len(df))
 
+if len(df) == 0:
+    print("No network flows captured in this window. Exiting cleanly.")
+    # Create an empty predictions file so the dashboard doesn't break
+    pd.DataFrame(columns=["Flow", "Prediction", "Confidence", "Severity", "Reason", "Key_Features"]).to_csv("prediction_results.csv", index=False)
+    import sys
+    sys.exit(0)
+
+
 # -------------------------------------------------
 # Feature alignment
 # -------------------------------------------------
@@ -178,6 +186,13 @@ if len(attack_flows) >= ATTACK_FLOW_THRESHOLD:
 else:
     print("No coordinated attack detected")
     print("Suspicious flows ignored as noise")
+    # Force the CSV results to be BENIGN since we consider them noise
+    for res in results:
+        if res["Prediction"] != "BENIGN":
+            res["Prediction"] = "BENIGN"
+            res["Severity"] = "LOW"
+            res["Reason"] = "Suspicious behavior suppressed as environmental noise (insufficient coordinated activity)."
+            res["Key_Features"] = "N/A"
 
 print("\nDetection completed.")
 

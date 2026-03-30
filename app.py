@@ -264,17 +264,27 @@ with st.sidebar:
         st.rerun()
     
     st.markdown("---")
-    st.markdown("### 📁 PCAP Analysis")
-    uploaded_file = st.file_uploader("Upload .pcap file", type=["pcap", "pcapng"])
+    st.markdown("### 📁 PCAP / CSV Analysis")
+    uploaded_file = st.file_uploader("Upload Network Data", type=["pcap", "pcapng", "csv"])
     if uploaded_file is not None:
-        if st.button("🔍 Analyze PCAP", use_container_width=True):
+        if st.button("🔍 Analyze Traffic", use_container_width=True):
             st.session_state.is_monitoring = False
             st.session_state.pcap_mode = True
-            with open("temp_upload.pcap", "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            with st.spinner("Analyzing PCAP file..."):
-                subprocess.run([sys.executable, "flow_extractor.py", "temp_upload.pcap"], check=True)
-                subprocess.run([sys.executable, "predict_live.py"], check=True)
+            
+            file_ext = uploaded_file.name.split('.')[-1].lower()
+            
+            with st.spinner("Analyzing uploaded file..."):
+                if file_ext == 'csv':
+                    # Bypass extraction for synthetic/pre-extracted CSV files
+                    with open("live_flows_basic.csv", "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    subprocess.run([sys.executable, "predict_live.py"], check=True)
+                else:
+                    # Normal PCAP extraction pipeline
+                    with open("temp_upload.pcap", "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    subprocess.run([sys.executable, "flow_extractor.py", "temp_upload.pcap"], check=True)
+                    subprocess.run([sys.executable, "predict_live.py"], check=True)
             st.rerun()
 
     st.markdown("---")
@@ -296,6 +306,7 @@ with st.sidebar:
 # ----------------------------------------------------
 # Data Pipeline Execution
 # ----------------------------------------------------
+run_pipeline = False
 if st.session_state.is_monitoring:
     # We use a placeholder so the UI doesn't jump too much
     status_text = st.sidebar.empty()
@@ -305,11 +316,10 @@ if st.session_state.is_monitoring:
         subprocess.run([sys.executable, "flow_extractor.py"], check=True)
         subprocess.run([sys.executable, "predict_live.py"], check=True)
         status_text.success("✅ Analysis Complete")
+        run_pipeline = True
     except Exception as e:
         status_text.error(f"❌ Pipeline Error: {e}")
-        
-    time.sleep(refresh_rate)
-    st.rerun() # Use standard st.rerun() available in newer Streamlit
+
 
 # Ensure baseline prediction results exist
 if not os.path.exists("prediction_results.csv"):
@@ -438,16 +448,6 @@ with col1:
     fig1.update_traces(marker={"line": {"width": 1, "color": '#60a5fa'}})
     st.plotly_chart(fig1, use_container_width=True, config={'displayModeBar': False})
 
-with col2:
-    fig2 = px.scatter(
-        df, x="Flow Duration", y="Flow Bytes/s", size="Total Fwd Packets",
-        title="Duration vs Byte Rate Topology",
-        color_discrete_sequence=['#8b5cf6'],
-        opacity=0.7
-    )
-    fig2.update_layout(**PLOTLY_THEME['layout'])
-    st.plotly_chart(fig2, use_container_width=True, config={'displayModeBar': False})
-
 st.markdown("<div class='section-title'>📈 Real-time Network Fingerprint</div>", unsafe_allow_html=True)
 
 df["Flow Sequence"] = range(len(df))
@@ -493,8 +493,30 @@ fig4.update_traces(marker={"size": 10, "line": {"width": 1, "color": 'rgba(255,2
 fig4.update_layout(**PLOTLY_THEME['layout'])
 st.plotly_chart(fig4, use_container_width=True, config={'displayModeBar': False})
 
+st.markdown("<div class='section-title'>🌌 Duration vs Byte Rate Topology</div>", unsafe_allow_html=True)
+# Ensure size column has no negative values to prevent plotly crash
+df_plot = df.copy()
+df_plot["Total Fwd Packets_abs"] = df_plot["Total Fwd Packets"].abs()
+
+fig2 = px.scatter(
+    df_plot, x="Flow Duration", y="Flow Bytes/s", size="Total Fwd Packets_abs",
+    title="Duration vs Byte Rate Topology",
+    color_discrete_sequence=['#8b5cf6'],
+    opacity=0.7
+)
+fig2.update_layout(**PLOTLY_THEME['layout'])
+st.plotly_chart(fig2, use_container_width=True, config={'displayModeBar': False})
+
 # ----------------------------------------------------
 # Flow Data Table
 # ----------------------------------------------------
 st.markdown("<div class='section-title'>🖧 Raw Network Telemetry</div>", unsafe_allow_html=True)
-st.dataframe(df_merged, use_container_width=True, height=400)
+st.dataframe(df_merged, use_container_width=True, height=400)
+
+# ----------------------------------------------------
+# Refresh Engine Manager
+# ----------------------------------------------------
+if st.session_state.is_monitoring and run_pipeline:
+    time.sleep(refresh_rate)
+    st.rerun()
+
